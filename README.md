@@ -1,101 +1,123 @@
 # My Raspberry Pi Server Network
 
-Currently, I have just two Raspberry Pi servers. But this network setup is theoretically capable of supporting hundreds of servers—well, technically up to 254. So, why limit it by labeling it a  _“2-Pi server network”_? Such a modest name doesn’t do justice to its potential. Moreover, it feels somewhat absurd to keep an entire router powered 24/7 merely to access two tiny devices. To put it bluntly, it’s ridiculous.
+Currently, I have just two Raspberry Pi servers. However, this network setup is theoretically capable of supporting hundreds of servers—well, technically up to 254. So, why limit it by labeling it a  _"2-Pi server network"_? Such a modest name wouldn’t do justice to its potential. Moreover, it feels somewhat absurd to keep an entire router powered 24/7 merely to access two tiny devices. To put it bluntly, it’s ridiculous.
 
-To add insult to injury, this router consumes around  _5.04–12.10 kWh per week_  (_typical consumption_: approximately  _7.56 kWh_), costing anywhere between  _₹32.76 and ₹96.20 per week_  (_typical cost_: _₹49.14–₹60.09_)—just for the privilege of maintaining connectivity with two small computers. Therefore, I’ve decided simply to call this  _my server network_, which serves as a gentle reminder of its scalability and potential size, not wastage of electricity.
+To add insult to injury, this router consumes around  _5.04–12.10 kWh per week_  (_typical consumption_: approximately  _7.56 kWh_), costing anywhere between  _₹32.76 and ₹96.20 per week_  (_typical cost_:  _₹49.14–₹60.09_)—just for the privilege of maintaining connectivity with two small computers. Therefore, I’ve decided simply to call this  _my server network_, which serves as a gentle reminder of its scalability and potential size rather than its wastage of electricity.
 
 ### Setting It All Up
 
-When configuring my servers, I ran into a particular challenge. Before diving into that, let me outline clearly what I wanted to achieve:
+When configuring my servers, I ran into a particular challenge. Before diving into that, let me clearly outline what I wanted to achieve:
 
-- **Remote Access:**  Access both Raspberry Pis via SSH and/or VNC.
+-   **Remote Access:**  Access both Raspberry Pis via SSH and VNC.
+    
+-   **Internet Connectivity:**  Ensure the servers maintain internet access whenever my personal hotspot (via my iPhone) is available. This allows scheduled tasks, such as regular backups, to run smoothly. For instance, I have scheduled bi-weekly backups of my current project—the Sienna repository and its branches—to maintain reliable data backups.
+    
 
-- **Internet Connectivity:**  Ensure that the servers maintain internet access whenever my personal hotspot (via my iPhone) is available. This allows scheduled tasks, such as regular backups, to run smoothly. For instance, I have scheduled bi-weekly backups of my current project—the Sienna repository and its branches—to maintain data backups.
+The issue arose because my MacBook has only one Wi-Fi adapter, meaning it can connect to only one Wi-Fi network at a time. This limitation is not Apple's fault though—I don't think more than 5% of laptops worldwide come with multiple built-in Wi-Fi adapters.
 
-The issue arose because my MacBook has only one Wi-Fi adapter, meaning I can connect to just one Wi-Fi network at a time. This limitation is not Apple's fault though; I don't think any laptop that more than 5% of world uses have more than one built-in Wi-Fi adapter.
-
-A straightforward solution is to air-gap the Pis by keeping them isolated, but that would eliminate internet access. Clearly, not ideal. Instead, here’s my solution that meets all my requirements and even gracefully handles scenarios when my iPhone hotspot isn’t available.
+A straightforward solution might be to air-gap the Pis by keeping them isolated, but that would eliminate internet access entirely—clearly not ideal. After considerable experimentation (and several enlightening conversations with GPT), I developed a more elegant solution.
 
 ### My Solution Explained
 
-At the heart of this solution is a switch—specifically, a router so with Wi-Fi capability. Here’s how it works:
+Initially, I considered connecting my Wi-Fi router directly to my iPhone’s hotspot and then distributing internet access to the entire LAN. Unfortunately, this didn’t work because my router (like most consumer-grade routers) can't source its WAN connection from a Wi-Fi or LAN client; it insists on using a dedicated WAN port.
 
--  **Local Network (LAN):**  All Raspberry Pis connect to the switch via Ethernet, forming a stable LAN.
+However, I realized I could utilize a built-in router setting: the default gateway, often referred to simply as the "router address." Typically, routers set themselves as the default gateway, instructing all devices on the LAN to route traffic through them. But it turns out you can override this gateway to point elsewhere—in my case, to a Raspberry Pi.
 
-- **Internet Access:**  The switch automatically connects to my iPhone’s hotspot whenever it’s available, distributing internet access across the entire LAN.
+I chose my Raspberry Pi 4 for this task because routing introduces some overhead. My Pi is now configured to automatically connect to my iPhone's hotspot whenever it’s available. It acts as the network gateway, receiving internet requests via Ethernet, forwarding them via Wi-Fi to my hotspot, and returning responses back to the clients on the LAN. This essentially turns my Pi into the network’s primary router and internet handler—without needing additional hardware or incurring further costs.
 
--  **Flexibility:**  My Mac can directly use the iPhone’s internet or connect via Ethernet/Wi-Fi to the switch, accessing both internet and servers through the same infrastructure. Additionally, since internet and server connections are independent, I can access the servers even if the internet is down.
+### Flexibility of this Setup:
 
-Below are diagrams representing different operational modes:
+My Mac can either connect directly to my iPhone's hotspot or join the server network via Ethernet/Wi-Fi. Thanks to the independence of internet and LAN connectivity, I retain full access to the servers even if internet service is down.
+
+Below are diagrams clearly representing the different operational modes of my setup:
+
+----------
 
 **Mode 1 — Idle Mode**
 
-**Scheduled tasks running on servers; Mac disconnected from LAN**
+_Scheduled tasks running on servers; Mac disconnected from LAN._
 
 ```mermaid
 graph TD
     iPhone([iPhone Personal Hotspot])
+    Rpi([Raspberry Pi 4])
     Switch([Switch])
     Mac([Mac])
     Servers([Servers])
 
-    iPhone --Internet--> Switch
+    iPhone --Internet--> Rpi
     iPhone --Internet--> Mac
-    Switch --> Servers
+    Switch --LAN--> Servers
+    Switch <--Gateway--> Rpi
+    Servers <--Request--> Rpi
+
 ```
 
 ----------
 
 **Mode 2 — Access Mode**
 
-**Mac connected to the server LAN; internet available via switch**
+_Mac connected to the server LAN; internet available via Raspberry Pi._
 
 ```mermaid
 graph TD
     iPhone([iPhone Personal Hotspot])
+    Rpi([Raspberry Pi 4])
     Switch([Switch])
     Mac([Mac])
     Servers([Servers])
 
-    iPhone --Internet--> Switch
-    Switch --> Servers
+    iPhone --Internet--> Rpi
+    Switch --LAN--> Servers
     Switch --> Mac
+    iPhone --Internet--> Mac
+    Switch <--Gateway--> Rpi
+    Servers <--Request--> Rpi
+
 ```
 
 ----------
 
 **Mode 3 — Offline LAN**
 
-**Mac connected to server LAN; no internet access**
+_Mac connected to server LAN; no internet access._
 
 ```mermaid
 graph TD
     Mac([Mac])
     Switch([Switch])
+    Rpi([Raspberry Pi 4])
     Servers([Servers])
 
     Switch --> Servers
     Switch --> Mac
+    Switch --> Rpi
+
 ```
 
 ----------
 
 **Mode 4 — Autonomous Mode**
 
-  
-
-**Fully offline and autonomous scheduled tasks (when I’m away)**
+_Fully offline autonomous scheduled tasks (when I’m away)._
 
 ```mermaid
 graph TD
     Switch([Switch])
+    Rpi([Raspberry Pi 4])
     Servers([Servers])
 
     Switch --> Servers
+    Switch --> Rpi
+
 ```
 
 ----------
 
+**An Elegant Touch: Handling Internet Outages**
+
+To add a professional touch, my Pi behaves exactly like modern ISP routers. If my hotspot is unavailable, instead of quietly dropping packets and making clients wait, it immediately replies with an ICMP Destination Unreachable message. This way, all devices instantly know when the internet is offline, providing a smooth, responsive user experience typical of professional-grade networks.
+
 **Will I Ever Use These Servers?**
 
-Probably never. But hey, it sounds impressive to casually mention that I maintain a custom, self-hosted server network. Plus, my hostel covers the electricity bill anyway, so it’s essentially free bragging rights—efficiency be damned!
+Probably never. But hey, it sounds darn cool to casually mention that I maintain a custom, self-hosted, dynamically routed server network with intelligent failover. Plus, since my hostel covers the electricity bill, it's essentially free bragging rights—efficiency be damned!
